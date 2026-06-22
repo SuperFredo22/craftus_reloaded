@@ -1,0 +1,18 @@
+name: Build Craftus 3DS
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install 3DS libs
+        run: dkp-pacman -Sy --needed --noconfirm 3ds-dev
+      - name: Build
+        run: make
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: craftus-survie
+          path: "*.3dsx"
+          if-no-files-found: error
