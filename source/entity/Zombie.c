@@ -38,6 +38,19 @@ void Zombie_Update(Entity* e, float dt, struct World* world) {
 
 	if (z2->attackCooldown > 0.f) z2->attackCooldown -= dt;
 
+	// Verbrennt am Tag, wenn er dem freien Himmel ausgesetzt ist.
+	bool day = world->time.timeOfDay > 0.30f && world->time.timeOfDay < 0.70f;
+	if (day) {
+		int surface = World_GetHeight(world, FastFloor(e->position.x), FastFloor(e->position.z));
+		if (e->position.y >= (float)surface) {  // kein Block über ihm
+			e->health -= dt * 2.f;
+			if (e->health <= 0.f) {
+				e->removed = true;
+				return;
+			}
+		}
+	}
+
 	bool chasing = false;
 	if (player) {
 		float dx = player->position.x - e->position.x;

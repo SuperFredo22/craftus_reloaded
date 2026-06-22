@@ -280,7 +280,13 @@ void PlayerController_Update(PlayerController* ctrl, InputData input, float dt) 
 	float breakBlock = IsKeyDown(ctrl->controlScheme.breakBlock, &agnosticInput);
 	if (placeBlock > 0.f) Player_PlaceBlock(player);
 	if (breakBlock > 0.f) {
-		Player_BreakBlock(player, dt);
+		// Zielt der Spieler auf eine Entity, wird angegriffen statt abgebaut.
+		if (Player_AttackEntity(player, dt)) {
+			player->isBreakingBlock = false;
+			player->breakProgress = 0.f;
+		} else {
+			Player_BreakBlock(player, dt);
+		}
 	} else {
 		// Abbau-Fortschritt zurücksetzen, sobald die Taste losgelassen wird.
 		player->isBreakingBlock = false;

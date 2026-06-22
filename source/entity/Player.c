@@ -1,6 +1,7 @@
 #include <entity/Player.h>
 
 #include <blocks/BlockProperties.h>
+#include <entity/Sheep.h>
 #include <inventory/Item.h>
 #include <misc/Collision.h>
 #include <world/Direction.h>
@@ -86,6 +87,7 @@ void Player_Init(Player* player, World* world) {
 	player->breakProgress = 0.f;
 	player->isBreakingBlock = false;
 	player->breakingBlockX = player->breakingBlockY = player->breakingBlockZ = 0;
+	player->attackCooldown = 0.f;
 
 	// Standard ist Kreativ (Verhalten exakt wie zuvor). main.c überschreibt das nach der Weltauswahl.
 	Player_SetGameMode(player, GameMode_Creative);
@@ -413,6 +415,89 @@ void Player_BreakBlock(Player* player, float dt) {
 		player->breakProgress = 0.f;
 		player->isBreakingBlock = false;
 	}
+}
+
+// Strahl-gegen-AABB (Slab-Methode). Schreibt den Trefferabstand nach tHit.
+static bool rayIntersectsAABB(float3 ro, float3 rd, float3 mn, float3 mx, float* tHit) {
+	float tmin = 0.f, tmax = 1e9f;
+	for (int i = 0; i < 3; i++) {
+		float o = ro.v[i], d = rd.v[i];
+		if (ABS(d) < 1e-6f) {
+			if (o < mn.v[i] || o > mx.v[i]) return false;
+		} else {
+			float t1 = (mn.v[i] - o) / d;
+			float t2 = (mx.v[i] - o) / d;
+			if (t1 > t2) {
+				float tmp = t1;
+				t1 = t2;
+				t2 = tmp;
+			}
+			if (t1 > tmin) tmin = t1;
+			if (t2 < tmax) tmax = t2;
+			if (tmin > tmax) return false;
+		}
+	}
+	*tHit = tmin;
+	return true;
+}
+
+bool Player_AttackEntity(Player* player, float dt) {
+	if (player->attackCooldown > 0.f) player->attackCooldown -= dt;
+	World* world = player->world;
+	if (!world) return false;
+
+	float3 eye = f3_new(player->position.x, player->position.y + PLAYER_EYEHEIGHT, player->position.z);
+	float3 dir = player->view;
+	const float reach = 4.f;
+
+	int best = -1;
+	float bestT = reach;
+	for (int i = 0; i < world->entityCount; i++) {
+		Entity* e = &world->entities[i];
+		float3 mn = f3_new(e->position.x - e->collisionBox.x / 2.f, e->position.y, e->position.z - e->collisionBox.z / 2.f);
+		float3 mx = f3_new(e->position.x + e->collisionBox.x / 2.f, e->position.y + e->collisionBox.y,
+				   e->position.z + e->collisionBox.z / 2.f);
+		float t;
+		if (rayIntersectsAABB(eye, dir, mn, mx, &t) && t >= 0.f && t < bestT) {
+			bestT = t;
+			best = i;
+		}
+	}
+	if (best < 0) return false;
+
+	if (player->attackCooldown <= 0.f) {
+		Entity* e = &world->entities[best];
+
+		float dmg = 1.f;  // bloße Faust
+		ItemStack* held = &player->quickSelectBar[player->quickSelectBarSlot];
+		if (held->amount > 0 && Item_IsTool(held->block)) {
+			ItemProps tp = Item_GetProps(held->block);
+			if (tp.attackDamage > 0) dmg = tp.attackDamage;
+			// Waffe nutzt sich beim Angriff ab.
+			if (held->meta > 0) held->meta--;
+			if (held->meta == 0) *held = (ItemStack){Block_Air, 0, 0};
+		}
+		e->health -= dmg;
+
+		// Rückstoß weg vom Spieler.
+		float3 kb = f3_new(e->position.x - player->position.x, 0.f, e->position.z - player->position.z);
+		float m = f3_mag(kb);
+		if (m > 0.001f) kb = f3_scl(kb, 1.f / m);
+		e->velocity.x += kb.x * 5.f;
+		e->velocity.z += kb.z * 5.f;
+		e->velocity.y += 3.f;
+
+		if (e->health <= 0.f) {
+			// Getötetes Schaf gibt seine Wolle.
+			if (e->type == EntityType_Sheep) {
+				SheepData* s = (SheepData*)e->data;
+				Player_GiveItem(player, Block_Wool, (uint8_t)(s->woolColor & 15), 1);
+			}
+			e->removed = true;
+		}
+		player->attackCooldown = 0.4f;
+	}
+	return true;
 }
 
 void Player_UpdateSurvival(Player* player, float dt) {

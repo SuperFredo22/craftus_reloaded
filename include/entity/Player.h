@@ -55,6 +55,8 @@ typedef struct Player {
 	float breakProgress;  // 0-1 Fortschritt beim Abbauen
 	int breakingBlockX, breakingBlockY, breakingBlockZ;
 	bool isBreakingBlock;
+
+	float attackCooldown;  // Sekunden bis zum nächsten Nahkampfangriff auf eine Entity
 } Player;
 
 void Player_Init(Player* player, World* world);
@@ -71,6 +73,10 @@ void Player_Move(Player* player, float dt, float3 accl);
 
 void Player_PlaceBlock(Player* player);
 void Player_BreakBlock(Player* player, float dt);
+
+// Nahkampfangriff per Sichtstrahl auf die nächste Entity in Reichweite.
+// Gibt true zurück, wenn eine Entity anvisiert wurde (dann nicht abbauen).
+bool Player_AttackEntity(Player* player, float dt);
 
 void Player_Jump(Player* player, float3 accl);
 
