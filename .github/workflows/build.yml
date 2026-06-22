@@ -7,7 +7,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install 3DS libs
-        run: dkp-pacman -Sy --needed --noconfirm 3ds-dev
+        # Das devkitARM-Image enthält 3ds-dev bereits; ein zeitweiliger
+        # Ausfall des Paketservers (z.B. HTTP 403) darf den Build nicht stoppen.
+        run: dkp-pacman -Sy --needed --noconfirm 3ds-dev || echo "pacman sync failed, relying on preinstalled libs"
       - name: Build
         run: make
       - name: Upload artifact
