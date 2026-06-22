@@ -5,11 +5,14 @@
 #include <world/World.h>
 
 #include <gui/Inventory.h>
+#include <inventory/Item.h>
 #include <inventory/ItemStack.h>
 
 
 #include <misc/Raycast.h>
 #include <misc/VecMath.h>
+
+typedef enum { GameMode_Creative, GameMode_Survival } GameMode;
 
 #define PLAYER_EYEHEIGHT (1.65f)
 #define PLAYER_HEIGHT (1.8f)
@@ -42,16 +45,32 @@ typedef struct {
 
 	Raycast_Result viewRayCast;
 	bool blockInSeight, blockInActionRange;
+
+	// --- Survival ---
+	GameMode gameMode;
+	float health;      // 0-20 (halbe Herzen)
+	float hunger;      // 0-20
+	float saturation;  // Puffer, wird vor hunger abgebaut
+
+	float breakProgress;  // 0-1 Fortschritt beim Abbauen
+	int breakingBlockX, breakingBlockY, breakingBlockZ;
+	bool isBreakingBlock;
 } Player;
 
 void Player_Init(Player* player, World* world);
 
+// Setzt den Spielmodus, Stats und das passende Start-Inventar.
+void Player_SetGameMode(Player* player, GameMode mode);
+
 void Player_Update(Player* player);
+
+// Survival-Logik (Hunger, Regeneration, Tod). Jeden Frame mit echtem dt aufrufen.
+void Player_UpdateSurvival(Player* player, float dt);
 
 void Player_Move(Player* player, float dt, float3 accl);
 
 void Player_PlaceBlock(Player* player);
-void Player_BreakBlock(Player* player);
+void Player_BreakBlock(Player* player, float dt);
 
 void Player_Jump(Player* player, float3 accl);
 

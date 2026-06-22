@@ -279,7 +279,13 @@ void PlayerController_Update(PlayerController* ctrl, InputData input, float dt) 
 	float placeBlock = IsKeyDown(ctrl->controlScheme.placeBlock, &agnosticInput);
 	float breakBlock = IsKeyDown(ctrl->controlScheme.breakBlock, &agnosticInput);
 	if (placeBlock > 0.f) Player_PlaceBlock(player);
-	if (breakBlock > 0.f) Player_BreakBlock(player);
+	if (breakBlock > 0.f) {
+		Player_BreakBlock(player, dt);
+	} else {
+		// Abbau-Fortschritt zurücksetzen, sobald die Taste losgelassen wird.
+		player->isBreakingBlock = false;
+		player->breakProgress = 0.f;
+	}
 
 	if (jump > 0.f) Player_Jump(player, movement);
 

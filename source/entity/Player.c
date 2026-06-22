@@ -1,6 +1,57 @@
 #include <entity/Player.h>
 
+#include <blocks/BlockProperties.h>
+#include <inventory/Item.h>
 #include <misc/Collision.h>
+#include <world/Direction.h>
+
+// Fügt amount Items (Block- oder Item-ID) ins Inventar ein. Erst Hotbar, dann Hauptinventar.
+// Gibt true zurück, wenn alles untergebracht wurde.
+static bool Player_GiveItem(Player* player, uint8_t id, uint8_t meta, int amount) {
+	bool stackable = !Item_IsTool(id);
+	// 1. In vorhandene Stacks einsortieren (nur stapelbare Items).
+	if (stackable) {
+		for (int i = 0; i < player->quickSelectBarSlots && amount > 0; i++) {
+			ItemStack* s = &player->quickSelectBar[i];
+			if (s->amount > 0 && s->block == id && s->meta == meta) {
+				int add = MIN(amount, ITEMSTACK_MAX - s->amount);
+				s->amount += add;
+				amount -= add;
+			}
+		}
+		int invCount = sizeof(player->inventory) / sizeof(ItemStack);
+		for (int i = 0; i < invCount && amount > 0; i++) {
+			ItemStack* s = &player->inventory[i];
+			if (s->amount > 0 && s->block == id && s->meta == meta) {
+				int add = MIN(amount, ITEMSTACK_MAX - s->amount);
+				s->amount += add;
+				amount -= add;
+			}
+		}
+	}
+	// 2. Leere Slots befüllen.
+	while (amount > 0) {
+		ItemStack* dst = NULL;
+		for (int i = 0; i < player->quickSelectBarSlots; i++)
+			if (player->quickSelectBar[i].amount == 0) {
+				dst = &player->quickSelectBar[i];
+				break;
+			}
+		if (!dst) {
+			int invCount = sizeof(player->inventory) / sizeof(ItemStack);
+			for (int i = 0; i < invCount; i++)
+				if (player->inventory[i].amount == 0) {
+					dst = &player->inventory[i];
+					break;
+				}
+		}
+		if (!dst) return false;  // voll
+		int add = stackable ? MIN(amount, ITEMSTACK_MAX) : 1;
+		*dst = (ItemStack){id, meta, add};
+		amount -= add;
+	}
+	return true;
+}
 
 void Player_Init(Player* player, World* world) {
 	player->position = f3_new(0.f, 0.f, 0.f);
@@ -31,26 +82,60 @@ void Player_Init(Player* player, World* world) {
 
 	player->quickSelectBarSlots = INVENTORY_QUICKSELECT_MAXSLOTS;
 	player->quickSelectBarSlot = 0;
-	{
-		int l = 0;
-		player->inventory[l++] = (ItemStack){Block_Stone, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Dirt, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Grass, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Cobblestone, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Sand, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Log, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Leaves, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Glass, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Stonebrick, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Brick, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Planks, 0, 1};
-		for (int i = 0; i < 16; i++) player->inventory[l++] = (ItemStack){Block_Wool, i, 1};
-		player->inventory[l++] = (ItemStack){Block_Bedrock, 0, 1};
 
-		for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
-	}
+	player->breakProgress = 0.f;
+	player->isBreakingBlock = false;
+	player->breakingBlockX = player->breakingBlockY = player->breakingBlockZ = 0;
+
+	// Standard ist Kreativ (Verhalten exakt wie zuvor). main.c überschreibt das nach der Weltauswahl.
+	Player_SetGameMode(player, GameMode_Creative);
 
 	player->autoJumpEnabled = true;
+}
+
+static void fillCreativeInventory(Player* player) {
+	int l = 0;
+	player->inventory[l++] = (ItemStack){Block_Stone, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Dirt, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Grass, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Cobblestone, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Sand, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Log, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Leaves, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Glass, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Stonebrick, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Brick, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Planks, 0, 1};
+	for (int i = 0; i < 16; i++) player->inventory[l++] = (ItemStack){Block_Wool, i, 1};
+	player->inventory[l++] = (ItemStack){Block_Bedrock, 0, 1};
+
+	for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
+}
+
+void Player_SetGameMode(Player* player, GameMode mode) {
+	player->gameMode = mode;
+
+	player->health = 20.f;
+	player->breakProgress = 0.f;
+	player->isBreakingBlock = false;
+
+	// Inventar leeren
+	int invCount = sizeof(player->inventory) / sizeof(ItemStack);
+	for (int i = 0; i < invCount; i++) player->inventory[i] = (ItemStack){Block_Air, 0, 0};
+	for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
+
+	if (mode == GameMode_Creative) {
+		player->hunger = 20.f;
+		player->saturation = 20.f;
+		fillCreativeInventory(player);
+	} else {
+		player->hunger = 20.f;
+		player->saturation = 5.f;
+		// Ein paar Start-Items zum schnellen Testen.
+		Player_GiveItem(player, ITEM_ID(Item_WoodPickaxe), Item_GetProps(ITEM_ID(Item_WoodPickaxe)).maxDurability, 1);
+		Player_GiveItem(player, ITEM_ID(Item_WoodAxe), Item_GetProps(ITEM_ID(Item_WoodAxe)).maxDurability, 1);
+		Player_GiveItem(player, ITEM_ID(Item_Apple), 0, 1);
+	}
 }
 
 void Player_Update(Player* player) {
@@ -155,6 +240,9 @@ void Player_Move(Player* player, float dt, float3 accl) {
 				finalPos.v[i] = newPos.v[i];
 			else if (i == 1) {
 				if (player->velocity.y < 0.f || accl.y < 0.f) player->grounded = true;
+				// Fallschaden: nur in Survival und nur bei harter Landung.
+				if (player->gameMode == GameMode_Survival && player->velocity.y < -16.f)
+					player->health -= (-player->velocity.y - 16.f) * 0.5f;
 				player->jumped = false;
 				player->velocity.x = 0.f;
 				player->velocity.y = 0.f;
@@ -201,7 +289,23 @@ void Player_Move(Player* player, float dt, float3 accl) {
 }
 
 void Player_PlaceBlock(Player* player) {
+	ItemStack* held = &player->quickSelectBar[player->quickSelectBarSlot];
+
+	// In Survival: Essen (Apfel) statt platzieren, wenn ein Nahrungs-Item gewählt ist.
+	if (player->gameMode == GameMode_Survival && held->amount > 0 && Item_IsFood(held->block)) {
+		if (player->breakPlaceTimeout < 0.f && player->hunger < 20.f) {
+			player->hunger = MIN(20.f, player->hunger + 4.f);
+			player->saturation = MIN(player->hunger, player->saturation + 2.4f);
+			if (--held->amount == 0) *held = (ItemStack){Block_Air, 0, 0};
+			player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+		}
+		return;
+	}
+
 	if (player->world && player->blockInActionRange && player->breakPlaceTimeout < 0.f) {
+		// Nichts platzieren wenn leer oder ein (nicht platzierbares) Item gewählt ist.
+		if (player->gameMode == GameMode_Survival && (held->amount == 0 || !Item_IsBlock(held->block))) return;
+
 		const int* offset = DirectionToOffset[player->viewRayCast.direction];
 		if (AABB_Overlap(player->position.x - PLAYER_COLLISIONBOX_SIZE / 2.f, player->position.y,
 				 player->position.z - PLAYER_COLLISIONBOX_SIZE / 2.f, PLAYER_COLLISIONBOX_SIZE, PLAYER_HEIGHT,
@@ -209,17 +313,134 @@ void Player_PlaceBlock(Player* player) {
 				 player->viewRayCast.z + offset[2], 1.f, 1.f, 1.f))
 			return;
 		World_SetBlockAndMeta(player->world, player->viewRayCast.x + offset[0], player->viewRayCast.y + offset[1],
-				      player->viewRayCast.z + offset[2], player->quickSelectBar[player->quickSelectBarSlot].block,
-				      player->quickSelectBar[player->quickSelectBarSlot].meta);
+				      player->viewRayCast.z + offset[2], held->block, held->meta);
+
+		// In Survival verbraucht das Platzieren einen Block.
+		if (player->gameMode == GameMode_Survival && --held->amount == 0) *held = (ItemStack){Block_Air, 0, 0};
 	}
 	if (player->breakPlaceTimeout < 0.f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
 }
 
-void Player_BreakBlock(Player* player) {
-	if (player->world && player->blockInActionRange && player->breakPlaceTimeout < 0.f) {
-		World_SetBlock(player->world, player->viewRayCast.x, player->viewRayCast.y, player->viewRayCast.z, Block_Air);
+static void Player_FinishBreaking(Player* player, int x, int y, int z) {
+	Block block = World_GetBlock(player->world, x, y, z);
+	BlockProperties props = Block_GetProperties(block);
+
+	// Werkzeugbewertung
+	ItemStack* held = &player->quickSelectBar[player->quickSelectBarSlot];
+	bool properTool = (props.properTool == 0);
+	if (held->amount > 0 && Item_IsTool(held->block)) {
+		ItemProps tp = Item_GetProps(held->block);
+		if (props.properTool != 0 && tp.toolCategory == props.properTool - 1 && tp.toolLevel >= props.requiredLevel)
+			properTool = true;
 	}
-	if (player->breakPlaceTimeout < 0.f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+
+	World_SetBlock(player->world, x, y, z, Block_Air);
+
+	// Drops nur, wenn das richtige Werkzeug benutzt wurde.
+	if (properTool && props.dropItem != Block_Air && props.dropAmount > 0) {
+		bool give = true;
+		if (props.dropRandom) give = (Xorshift32_Next(&player->world->randomTickGen) % 100) < 30;
+		if (give) {
+			uint8_t dropMeta = (props.dropItem == Block_Wool) ? World_GetMetadata(player->world, x, y, z) : 0;
+			Player_GiveItem(player, props.dropItem, dropMeta, props.dropAmount);
+		}
+	}
+
+	// Bonus-Drops: Gras -> Samen, Laub -> Apfel (jeweils ~30%).
+	if (block == Block_Grass && (Xorshift32_Next(&player->world->randomTickGen) % 100) < 30)
+		Player_GiveItem(player, ITEM_ID(Item_Seed), 0, 1);
+	if (block == Block_Leaves && (Xorshift32_Next(&player->world->randomTickGen) % 100) < 30)
+		Player_GiveItem(player, ITEM_ID(Item_Apple), 0, 1);
+
+	// Werkzeugverschleiß
+	if (held->amount > 0 && Item_IsTool(held->block)) {
+		if (held->meta > 0) held->meta--;
+		if (held->meta == 0) *held = (ItemStack){Block_Air, 0, 0};
+	}
+
+	// Abbau kostet etwas Sättigung.
+	player->saturation = MAX(0.f, player->saturation - 0.1f);
+}
+
+void Player_BreakBlock(Player* player, float dt) {
+	if (!(player->world && player->blockInActionRange)) {
+		player->isBreakingBlock = false;
+		player->breakProgress = 0.f;
+		return;
+	}
+
+	int x = player->viewRayCast.x, y = player->viewRayCast.y, z = player->viewRayCast.z;
+
+	// Kreativ: sofortiges Abbauen (Verhalten wie zuvor, mit Timeout-Drossel).
+	if (player->gameMode == GameMode_Creative) {
+		if (player->breakPlaceTimeout < 0.f) {
+			World_SetBlock(player->world, x, y, z, Block_Air);
+			player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+		}
+		return;
+	}
+
+	// Survival: fortschrittsbasiertes Abbauen.
+	if (!player->isBreakingBlock || x != player->breakingBlockX || y != player->breakingBlockY || z != player->breakingBlockZ) {
+		player->isBreakingBlock = true;
+		player->breakingBlockX = x;
+		player->breakingBlockY = y;
+		player->breakingBlockZ = z;
+		player->breakProgress = 0.f;
+	}
+
+	Block block = World_GetBlock(player->world, x, y, z);
+	if (block == Block_Air) {
+		player->isBreakingBlock = false;
+		player->breakProgress = 0.f;
+		return;
+	}
+	BlockProperties props = Block_GetProperties(block);
+
+	float speed = 1.f;
+	ItemStack* held = &player->quickSelectBar[player->quickSelectBarSlot];
+	if (held->amount > 0 && Item_IsTool(held->block)) {
+		ItemProps tp = Item_GetProps(held->block);
+		if (props.properTool != 0 && tp.toolCategory == props.properTool - 1)
+			speed = tp.miningSpeed;
+	}
+
+	float hardness = props.hardness < 0.05f ? 0.05f : props.hardness;
+	player->breakProgress += dt * speed / hardness;
+
+	if (player->breakProgress >= 1.f) {
+		Player_FinishBreaking(player, x, y, z);
+		player->breakProgress = 0.f;
+		player->isBreakingBlock = false;
+	}
+}
+
+void Player_UpdateSurvival(Player* player, float dt) {
+	if (player->gameMode != GameMode_Survival) return;
+
+	// Hunger baut langsam ab; Sättigung puffert.
+	if (player->saturation > 0.f) {
+		player->saturation = MAX(0.f, player->saturation - dt * 0.05f);
+	} else {
+		player->hunger = MAX(0.f, player->hunger - dt * 0.15f);
+	}
+
+	// Regeneration bei vollem Hunger.
+	if (player->hunger >= 18.f && player->health < 20.f) {
+		player->health = MIN(20.f, player->health + dt * 0.5f);
+		player->saturation = MAX(0.f, player->saturation - dt * 0.2f);
+	}
+	// Verhungern.
+	if (player->hunger <= 0.f && player->health > 0.f) {
+		player->health -= dt * 0.5f;
+	}
+
+	// Tod: Stats zurücksetzen, Inventar leeren, am Spawn neu starten.
+	if (player->health <= 0.f) {
+		Player_SetGameMode(player, GameMode_Survival);
+		int spawnY = World_GetHeight(player->world, 0, 0) + 1;
+		Player_Teleport(player, 0.5f, (float)spawnY, 0.5f);
+	}
 }
 
 void Player_Teleport(Player* player, float x, float y, float z) {
