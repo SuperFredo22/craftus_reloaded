@@ -79,7 +79,7 @@ void Sheep_Render(Entity* e, int projUniform, C3D_Mtx* projectionView) {
 	Mtx_Identity(&model);
 	// Box ist im LUT 1x1x1 mit Ursprung in der Ecke -> auf Fußmittelpunkt verschieben & skalieren.
 	Mtx_Translate(&model, e->position.x - e->collisionBox.x / 2.f, e->position.y, e->position.z - e->collisionBox.z / 2.f, true);
-	Mtx_Scale(&model, e->collisionBox.x, e->collisionBox.y, e->collisionBox.z, true);
+	Mtx_Scale(&model, e->collisionBox.x, e->collisionBox.y, e->collisionBox.z);
 
 	C3D_Mtx mvp;
 	Mtx_Multiply(&mvp, projectionView, &model);
