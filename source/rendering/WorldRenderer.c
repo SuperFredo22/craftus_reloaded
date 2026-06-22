@@ -12,6 +12,8 @@
 #include <rendering/Clouds.h>
 #include <rendering/Hand.h>
 
+#include <entity/Sheep.h>
+
 static Player* player;
 static World* world;
 
@@ -71,6 +73,8 @@ void WorldRenderer_Init(Player* player_, World* world_, WorkQueue* workqueue_, i
 	C3D_FogLutBind(&fogLut);
 
 	Clouds_Init();
+
+	Sheep_InitRender();
 }
 void WorldRenderer_Deinit() {
 	vec_deinit(&renderingQueue);
@@ -80,6 +84,8 @@ void WorldRenderer_Deinit() {
 	Hand_Deinit();
 
 	Clouds_Deinit();
+
+	Sheep_DeinitRender();
 }
 
 static void renderWorld() {
@@ -200,6 +206,14 @@ void WorldRenderer_Render(float iod) {
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, projectionUniform, &camera.vp);
 
 	renderWorld();
+
+	// Entities (Schafe) rendern.
+	for (int i = 0; i < world->entityCount; i++) {
+		Entity* e = &world->entities[i];
+		if (e->type == EntityType_Sheep) Sheep_Render(e, projectionUniform, &camera.vp);
+	}
+	// Blocktextur für nachfolgendes Rendering wiederherstellen.
+	C3D_TexBind(0, Block_GetTextureMap());
 
 	Clouds_Render(projectionUniform, &camera.vp, world, player->position.x, player->position.z);
 

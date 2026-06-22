@@ -11,6 +11,7 @@
 #include <rendering/Cursor.h>
 #include <rendering/PolyGen.h>
 #include <rendering/TextureMap.h>
+#include <rendering/VertexFmt.h>
 #include <rendering/WorldRenderer.h>
 
 #include <citro3d.h>
@@ -116,6 +117,57 @@ void Renderer_Deinit() {
 	C3D_Fini();
 }
 
+// Zeichnet das Survival-HUD (Herzen, Hunger, Tag/Nacht-Leiste, Abbaufortschritt) auf den unteren Bildschirm.
+// Erwartet, dass SpriteBatch_SetScale(2) aktiv ist (logische Auflösung 160x120).
+static void drawSurvivalHUD(Player* p) {
+	const int16_t bg = SHADER_RGB(2, 2, 2);
+	const int16_t red = SHADER_RGB(31, 2, 2);
+	const int16_t gold = SHADER_RGB(31, 26, 4);
+
+	// Herzen (10 Stück, je 2 Leben), links.
+	for (int i = 0; i < 10; i++) {
+		int x = 6 + i * 7;
+		int y = 86;
+		SpriteBatch_PushSingleColorQuad(x, y, 0, 6, 6, bg);
+		float hp = p->health - i * 2.f;
+		if (hp >= 2.f)
+			SpriteBatch_PushSingleColorQuad(x, y, 1, 6, 6, red);
+		else if (hp >= 1.f)
+			SpriteBatch_PushSingleColorQuad(x, y, 1, 3, 6, red);
+	}
+
+	// Hunger (10 Stück), rechts.
+	for (int i = 0; i < 10; i++) {
+		int x = 84 + i * 7;
+		int y = 86;
+		SpriteBatch_PushSingleColorQuad(x, y, 0, 6, 6, bg);
+		float fd = p->hunger - i * 2.f;
+		if (fd >= 2.f)
+			SpriteBatch_PushSingleColorQuad(x, y, 1, 6, 6, gold);
+		else if (fd >= 1.f)
+			SpriteBatch_PushSingleColorQuad(x, y, 1, 3, 6, gold);
+	}
+
+	// Tag/Nacht-Leiste mit Marker.
+	{
+		int barX = 30, barY = 3, barW = 100, barH = 4;
+		float* sky = world->time.skyColor;
+		int16_t skyCol = SHADER_RGB((int)(CLAMP(sky[0], 0.f, 1.f) * 31.f), (int)(CLAMP(sky[1], 0.f, 1.f) * 31.f),
+					    (int)(CLAMP(sky[2], 0.f, 1.f) * 31.f));
+		SpriteBatch_PushSingleColorQuad(barX - 1, barY - 1, 0, barW + 2, barH + 2, bg);
+		SpriteBatch_PushSingleColorQuad(barX, barY, 1, barW, barH, skyCol);
+		int markerX = barX + (int)(world->time.timeOfDay * barW);
+		SpriteBatch_PushSingleColorQuad(markerX, barY - 1, 2, 2, barH + 2, INT16_MAX);
+	}
+
+	// Abbaufortschritt.
+	if (p->isBreakingBlock && p->breakProgress > 0.f) {
+		int barX = 50, barY = 78, barW = 60, barH = 4;
+		SpriteBatch_PushSingleColorQuad(barX - 1, barY - 1, 0, barW + 2, barH + 2, bg);
+		SpriteBatch_PushSingleColorQuad(barX, barY, 1, (int)(barW * CLAMP(p->breakProgress, 0.f, 1.f)), barH, INT16_MAX);
+	}
+}
+
 void Renderer_Render() {
 	float iod = osGet3DSliderState() * PLAYER_HALFEYEDIFF;
 
@@ -123,8 +175,18 @@ void Renderer_Render() {
 
 	if (*gamestate == GameState_Playing) PolyGen_Harvest();
 
+	// In Survival folgt die Himmelsfarbe dem Tag/Nacht-Zyklus; Kreativ bleibt unverändert.
+	uint32_t clearColorSky = CLEAR_COLOR_SKY;
+	if (*gamestate == GameState_Playing && player->gameMode == GameMode_Survival) {
+		float* sky = world->time.skyColor;
+		uint32_t r = (uint32_t)(CLAMP(sky[0], 0.f, 1.f) * 255.f);
+		uint32_t g = (uint32_t)(CLAMP(sky[1], 0.f, 1.f) * 255.f);
+		uint32_t b = (uint32_t)(CLAMP(sky[2], 0.f, 1.f) * 255.f);
+		clearColorSky = (r << 24) | (g << 16) | (b << 8) | 0xff;
+	}
+
 	for (int i = 0; i < 2; i++) {
-		C3D_RenderTargetClear(renderTargets[i], C3D_CLEAR_ALL, CLEAR_COLOR_SKY, 0);
+		C3D_RenderTargetClear(renderTargets[i], C3D_CLEAR_ALL, clearColorSky, 0);
 		C3D_FrameDrawOn(renderTargets[i]);
 
 		SpriteBatch_StartFrame(400, 240);
@@ -190,6 +252,8 @@ void Renderer_Render() {
 					  120 - INVENTORY_QUICKSELECT_HEIGHT, player->quickSelectBar, player->quickSelectBarSlots,
 					  &player->quickSelectBarSlot);
 		Inventory_Draw(0, 0, 160, player->inventory, sizeof(player->inventory) / sizeof(ItemStack));
+
+		if (player->gameMode == GameMode_Survival) drawSurvivalHUD(player);
 
 		if (showDebugInfo) DebugUI_Draw();
 	}
