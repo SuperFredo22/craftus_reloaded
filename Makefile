@@ -58,6 +58,13 @@ CFLAGS	:=	-g -Wall -mword-relocations \
 			 -ffunction-sections $(CFLAGS_ADD)\
 			$(ARCH) -save-temps
 
+# Der devkitARM :latest Container nutzt GCC 14+, der einige bisherige Warnungen
+# standardmäßig zu Fehlern macht. Der (ältere) Bestand des Projekts wird damit
+# wieder als Warnung behandelt, damit der Build durchläuft.
+CFLAGS	+=	-Wno-incompatible-pointer-types -Wno-int-conversion \
+			-Wno-implicit-function-declaration -Wno-implicit-int \
+			-Wno-discarded-qualifiers
+
 CFLAGS	+=	$(INCLUDE) -DARM11 -D_3DS
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++11
