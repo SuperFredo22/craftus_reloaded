@@ -144,14 +144,18 @@ int main() {
 
 			PlayerController_Update(&playerCtrl, inputData, dt);
 
+			World_Update(world, dt);
+			Player_UpdateSurvival(&player, dt);
+
 			World_UpdateChunkCache(world, WorldToChunkCoord(FastFloor(player.position.x)),
 					       WorldToChunkCoord(FastFloor(player.position.z)));
 		} else if (gamestate == GameState_SelectWorld) {
 			char path[256];
 			char name[WORLD_NAME_SIZE] = {'\0'};
 			WorldGenType worldType;
+			GameMode selectedMode = GameMode_Creative;
 			bool newWorld = false;
-			if (WorldSelect_Update(path, name, &worldType, &newWorld)) {
+			if (WorldSelect_Update(path, name, &worldType, &selectedMode, &newWorld)) {
 				strcpy(world->name, name);
 				world->genSettings.type = worldType;
 
@@ -189,6 +193,11 @@ int main() {
 					}
 					player.position.y = (float)highestBlock + 0.2f;
 				}
+
+				// Spielmodus festlegen: neue Welt -> Auswahl, bestehende -> aus Savegame.
+				GameMode mode = newWorld ? selectedMode : player.gameMode;
+				Player_SetGameMode(&player, mode);
+				if (mode == GameMode_Survival) World_SpawnInitialMobs(world);
 
 				gamestate = GameState_Playing;
 				lastTime = svcGetSystemTick();  // fix timing

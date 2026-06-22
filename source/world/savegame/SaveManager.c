@@ -62,6 +62,8 @@ void SaveManager_Load(SaveManager* mgr, char* path) {
 		mgr->player->flying = mpack_elvis(player, "flying", bool, false);
 		mgr->player->crouching = mpack_elvis(player, "crouching", bool, false);
 
+		mgr->player->gameMode = mpack_elvis(root, "gameMode", uint, GameMode_Creative);
+
 		mpack_error_t err = mpack_tree_destroy(&levelTree);
 		if (err != mpack_ok) {
 			Crash("Mpack error %d while loading world manifest %s", err, path);
@@ -72,7 +74,7 @@ void SaveManager_Load(SaveManager* mgr, char* path) {
 void SaveManager_Unload(SaveManager* mgr) {
 	mpack_writer_t writer;
 	mpack_writer_init_file(&writer, "level.mp");
-	mpack_start_map(&writer, 3);
+	mpack_start_map(&writer, 4);
 
 	mpack_write_cstr(&writer, "name");
 	mpack_write_cstr(&writer, mgr->world->name);
@@ -104,6 +106,9 @@ void SaveManager_Unload(SaveManager* mgr) {
 
 	mpack_write_cstr(&writer, "worldType");
 	mpack_write_uint(&writer, mgr->world->genSettings.type);
+
+	mpack_write_cstr(&writer, "gameMode");
+	mpack_write_uint(&writer, mgr->player->gameMode);
 
 	mpack_finish_map(&writer);
 

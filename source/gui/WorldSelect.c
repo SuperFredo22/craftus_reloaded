@@ -112,6 +112,9 @@ static WorldGenType worldGenType = WorldGen_SuperFlat;
 
 static char* worldGenTypesStr[] = {"Smea", "Superflat"};
 
+static GameMode gameMode = GameMode_Creative;
+static char* gameModeStr[] = {"Creative", "Survival"};
+
 static MenuState menustate = MenuState_SelectWorld;
 
 static float max_velocity = 20.f;
@@ -189,7 +192,15 @@ void WorldSelect_Render() {
 		}
 		Gui_EndRow();
 
-		Gui_VerticalSpace(Gui_RelativeHeight(0.4f));
+		Gui_BeginRowCenter(Gui_RelativeWidth(0.9f), 3);
+		Gui_Label(0.45f, true, INT16_MAX, false, "Game mode:");
+		Gui_Space(0.1f);
+		if (Gui_Button(0.45f, "%s", gameModeStr[gameMode])) {
+			gameMode = (gameMode == GameMode_Creative) ? GameMode_Survival : GameMode_Creative;
+		}
+		Gui_EndRow();
+
+		Gui_VerticalSpace(Gui_RelativeHeight(0.25f));
 
 		Gui_BeginRowCenter(Gui_RelativeWidth(0.9f), 3);
 		canceled_world_options = Gui_Button(0.45f, "Cancel");
@@ -198,7 +209,8 @@ void WorldSelect_Render() {
 	}
 }
 
-bool WorldSelect_Update(char* out_worldpath, char* out_name, WorldGenType* worldType, bool* newWorld) {
+bool WorldSelect_Update(char* out_worldpath, char* out_name, WorldGenType* worldType, GameMode* out_gameMode, bool* newWorld) {
+	*out_gameMode = gameMode;
 	if (clicked_new_world) {
 		clicked_new_world = false;
 		menustate = MenuState_WorldOptions;
@@ -206,6 +218,7 @@ bool WorldSelect_Update(char* out_worldpath, char* out_name, WorldGenType* world
 	if (confirmed_world_options) {
 		confirmed_world_options = false;
 		*worldType = worldGenType;
+		*out_gameMode = gameMode;
 
 		static SwkbdState swkbd;
 		static char name[WORLD_NAME_SIZE];
