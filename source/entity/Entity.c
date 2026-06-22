@@ -1,6 +1,7 @@
 #include <entity/Entity.h>
 
 #include <entity/Sheep.h>
+#include <entity/Zombie.h>
 
 #include <blocks/Block.h>
 #include <misc/NumberUtils.h>
@@ -60,6 +61,9 @@ void Entity_Update(Entity* e, float dt, struct World* world) {
 	switch (e->type) {
 		case EntityType_Sheep:
 			Sheep_Update(e, dt, world);
+			break;
+		case EntityType_Zombie:
+			Zombie_Update(e, dt, world);
 			break;
 		default:
 			break;

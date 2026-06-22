@@ -13,6 +13,7 @@
 #include <rendering/Hand.h>
 
 #include <entity/Sheep.h>
+#include <entity/Zombie.h>
 
 static Player* player;
 static World* world;
@@ -75,6 +76,7 @@ void WorldRenderer_Init(Player* player_, World* world_, WorkQueue* workqueue_, i
 	Clouds_Init();
 
 	Sheep_InitRender();
+	Zombie_InitRender();
 }
 void WorldRenderer_Deinit() {
 	vec_deinit(&renderingQueue);
@@ -86,6 +88,7 @@ void WorldRenderer_Deinit() {
 	Clouds_Deinit();
 
 	Sheep_DeinitRender();
+	Zombie_DeinitRender();
 }
 
 static void renderWorld() {
@@ -207,10 +210,13 @@ void WorldRenderer_Render(float iod) {
 
 	renderWorld();
 
-	// Entities (Schafe) rendern.
+	// Entities (Schafe, Zombies) rendern.
 	for (int i = 0; i < world->entityCount; i++) {
 		Entity* e = &world->entities[i];
-		if (e->type == EntityType_Sheep) Sheep_Render(e, projectionUniform, &camera.vp);
+		if (e->type == EntityType_Sheep)
+			Sheep_Render(e, projectionUniform, &camera.vp);
+		else if (e->type == EntityType_Zombie)
+			Zombie_Render(e, projectionUniform, &camera.vp);
 	}
 	// Blocktextur für nachfolgendes Rendering wiederherstellen.
 	C3D_TexBind(0, Block_GetTextureMap());

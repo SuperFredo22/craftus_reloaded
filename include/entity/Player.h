@@ -21,7 +21,7 @@ typedef enum { GameMode_Creative, GameMode_Survival } GameMode;
 
 #define PLAYER_PLACE_REPLACE_TIMEOUT (0.2f)
 
-typedef struct {
+typedef struct Player {
 	float3 position;
 	float pitch, yaw;
 	float bobbing, fovAdd, crouchAdd;

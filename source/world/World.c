@@ -3,7 +3,9 @@
 #include <blocks/BlockEvents.h>
 
 #include <entity/Entity.h>
+#include <entity/Player.h>
 #include <entity/Sheep.h>
+#include <entity/Zombie.h>
 
 #include <string.h>
 
@@ -23,6 +25,8 @@ void World_Init(World* world, WorkQueue* workqueue) {
 
 	WorldTime_Init(&world->time);
 	world->entityCount = 0;
+	world->player = NULL;
+	world->mobSpawnTimer = 12.f;
 
 	World_Reset(world);
 }
@@ -32,6 +36,7 @@ void World_Reset(World* world) {
 	world->cacheTranslationZ = 0;
 
 	world->entityCount = 0;
+	world->mobSpawnTimer = 12.f;
 	WorldTime_Init(&world->time);
 
 	vec_clear(&world->freeChunks);
@@ -253,6 +258,13 @@ void World_RemoveEntity(World* world, int index) {
 	world->entityCount--;
 }
 
+static int World_CountEntities(World* world, EntityType type) {
+	int count = 0;
+	for (int i = 0; i < world->entityCount; i++)
+		if (world->entities[i].type == type) count++;
+	return count;
+}
+
 void World_Update(World* world, float dt) {
 	WorldTime_Update(&world->time, dt);
 
@@ -261,6 +273,25 @@ void World_Update(World* world, float dt) {
 		if (world->entities[i].removed) {
 			World_RemoveEntity(world, i);
 			i--;
+		}
+	}
+
+	// Monster (Zombies) tauchen in der Survival-Welt nach und nach auf, gedeckelt.
+	if (world->player && world->player->gameMode == GameMode_Survival) {
+		world->mobSpawnTimer -= dt;
+		if (world->mobSpawnTimer <= 0.f) {
+			// Nachts häufiger nachspawnen als tagsüber.
+			bool night = world->time.timeOfDay < 0.25f || world->time.timeOfDay > 0.75f;
+			world->mobSpawnTimer = night ? 8.f : 20.f;
+
+			if (World_CountEntities(world, EntityType_Zombie) < WORLD_MAX_ZOMBIES) {
+				float angle = (float)(Xorshift32_Next(&world->randomTickGen) % 360) * 3.14159265f / 180.f;
+				float radius = 18.f + (float)(Xorshift32_Next(&world->randomTickGen) % 8);
+				int x = FastFloor(world->player->position.x + sinf(angle) * radius);
+				int z = FastFloor(world->player->position.z + cosf(angle) * radius);
+				int y = World_GetHeight(world, x, z) + 1;
+				World_AddEntity(world, Zombie_Create((float)x + 0.5f, (float)y, (float)z + 0.5f));
+			}
 		}
 	}
 }
@@ -273,5 +304,13 @@ void World_SpawnInitialMobs(World* world) {
 		int y = World_GetHeight(world, x, z) + 1;
 		int color = Xorshift32_Next(&world->randomTickGen) % 16;
 		World_AddEntity(world, Sheep_Create((float)x + 0.5f, (float)y, (float)z + 0.5f, color));
+	}
+
+	// Ein paar Zombies zum sofortigen Testen.
+	for (int i = 0; i < 3; i++) {
+		int x = (int)(Xorshift32_Next(&world->randomTickGen) % 24) - 12;
+		int z = (int)(Xorshift32_Next(&world->randomTickGen) % 24) - 12;
+		int y = World_GetHeight(world, x, z) + 1;
+		World_AddEntity(world, Zombie_Create((float)x + 0.5f, (float)y, (float)z + 0.5f));
 	}
 }

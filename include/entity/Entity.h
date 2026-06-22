@@ -8,7 +8,7 @@
 // Vorwärtsdeklaration; die echte Definition steht in world/World.h.
 struct World;
 
-typedef enum { EntityType_Sheep, EntityType_Count } EntityType;
+typedef enum { EntityType_Sheep, EntityType_Zombie, EntityType_Count } EntityType;
 
 // Generischer, typunabhängiger Datenpuffer für entity-spezifische Daten (z.B. SheepData).
 #define ENTITY_DATA_SIZE 32

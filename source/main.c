@@ -78,6 +78,7 @@ int main() {
 	WorldSelect_Init();
 
 	World_Init(world, &chunkWorker.queue);
+	world->player = &player;  // für die Monster-KI
 
 	SaveManager savemgr;
 	SaveManager_Init(&savemgr, &player);

@@ -31,6 +31,9 @@ typedef struct {
 #define WORLD_NAME_SIZE 12
 
 #define WORLD_MAX_ENTITIES 256
+#define WORLD_MAX_ZOMBIES 8
+
+struct Player;
 
 typedef struct World {
 	char name[WORLD_NAME_SIZE];
@@ -51,6 +54,9 @@ typedef struct World {
 
 	Entity entities[WORLD_MAX_ENTITIES];
 	int entityCount;
+
+	struct Player* player;  // für die Mob-KI (Verfolgung/Angriff)
+	float mobSpawnTimer;    // Sekunden bis zum nächsten Monster-Spawn
 } World;
 
 inline static int WorldToChunkCoord(int x) { return (x + (int)(x < 0)) / CHUNK_SIZE - (int)(x < 0); }
