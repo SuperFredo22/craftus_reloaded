@@ -21,6 +21,9 @@ enum { Block_Air,
        Block_Planks,
        Block_Wool,
        Block_Bedrock,
+       Block_IronOre,
+       Block_GoldOre,
+       Block_DiamondOre,
        Blocks_Count };
 
 void Block_Init();

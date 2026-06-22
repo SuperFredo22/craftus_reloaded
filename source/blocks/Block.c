@@ -109,6 +109,12 @@ void Block_GetTexture(Block block, Direction direction, uint8_t metadata, int16_
 		case Block_Bedrock:
 			i = icon.bedrock;
 			break;
+		case Block_IronOre:
+		case Block_GoldOre:
+		case Block_DiamondOre:
+			// Platzhalter: Steintextur wird über Block_GetColor eingefärbt
+			i = icon.stone;
+			break;
 		default: break;
 	}
 	out_uv[0] = i.u;
@@ -134,6 +140,18 @@ void Block_GetColor(Block block, uint8_t metadata, Direction direction, uint8_t 
 		out_rgb[0] = extractR(dies[metadata]);
 		out_rgb[1] = extractG(dies[metadata]);
 		out_rgb[2] = extractB(dies[metadata]);
+	} else if (block == Block_IronOre) {
+		out_rgb[0] = 216;
+		out_rgb[1] = 175;
+		out_rgb[2] = 147;
+	} else if (block == Block_GoldOre) {
+		out_rgb[0] = 252;
+		out_rgb[1] = 224;
+		out_rgb[2] = 90;
+	} else if (block == Block_DiamondOre) {
+		out_rgb[0] = 95;
+		out_rgb[1] = 219;
+		out_rgb[2] = 214;
 	} else {
 		out_rgb[0] = 255;
 		out_rgb[1] = 255;
@@ -143,5 +161,6 @@ void Block_GetColor(Block block, uint8_t metadata, Direction direction, uint8_t 
 
 bool Block_Opaque(Block block, uint8_t metadata) { return block != Block_Air && block != Block_Leaves && block != Block_Glass; }
 
-const char* BlockNames[Blocks_Count] = {"Air",    "Stone", "Dirt",	 "Grass",  "Cobblestone", "Sand", "Log",
-					"Leaves", "Glass", "Stone Bricks", "Bricks", "Planks",      "Wool", "Bedrock"};
+const char* BlockNames[Blocks_Count] = {"Air",    "Stone",  "Dirt",	  "Grass",	 "Cobblestone", "Sand",
+					"Log",	  "Leaves", "Glass",	  "Stone Bricks", "Bricks",	"Planks",
+					"Wool",	  "Bedrock", "Iron Ore",  "Gold Ore",	 "Diamond Ore"};
