@@ -2,6 +2,9 @@
 
 #include <blocks/BlockEvents.h>
 
+#include <entity/Entity.h>
+#include <entity/Sheep.h>
+
 #include <string.h>
 
 #include <assert.h>
@@ -18,12 +21,18 @@ void World_Init(World* world, WorkQueue* workqueue) {
 
 	vec_init(&world->freeChunks);
 
+	WorldTime_Init(&world->time);
+	world->entityCount = 0;
+
 	World_Reset(world);
 }
 
 void World_Reset(World* world) {
 	world->cacheTranslationX = 0;
 	world->cacheTranslationZ = 0;
+
+	world->entityCount = 0;
+	WorldTime_Init(&world->time);
 
 	vec_clear(&world->freeChunks);
 
@@ -229,4 +238,40 @@ void World_Tick(World* world) {
 				BlockEvent_RandomTick(world, chunk, xVals, yVals, zVals);
 			}
 		}
+}
+
+Entity* World_AddEntity(World* world, Entity entity) {
+	if (world->entityCount >= WORLD_MAX_ENTITIES) return NULL;
+	world->entities[world->entityCount] = entity;
+	return &world->entities[world->entityCount++];
+}
+
+void World_RemoveEntity(World* world, int index) {
+	if (index < 0 || index >= world->entityCount) return;
+	// Lücke mit dem letzten Element auffüllen (Reihenfolge egal).
+	world->entities[index] = world->entities[world->entityCount - 1];
+	world->entityCount--;
+}
+
+void World_Update(World* world, float dt) {
+	WorldTime_Update(&world->time, dt);
+
+	for (int i = 0; i < world->entityCount; i++) {
+		Entity_Update(&world->entities[i], dt, world);
+		if (world->entities[i].removed) {
+			World_RemoveEntity(world, i);
+			i--;
+		}
+	}
+}
+
+void World_SpawnInitialMobs(World* world) {
+	int count = 5 + (Xorshift32_Next(&world->randomTickGen) % 6);  // 5-10 Schafe
+	for (int i = 0; i < count; i++) {
+		int x = (int)(Xorshift32_Next(&world->randomTickGen) % 32) - 16;
+		int z = (int)(Xorshift32_Next(&world->randomTickGen) % 32) - 16;
+		int y = World_GetHeight(world, x, z) + 1;
+		int color = Xorshift32_Next(&world->randomTickGen) % 16;
+		World_AddEntity(world, Sheep_Create((float)x + 0.5f, (float)y, (float)z + 0.5f, color));
+	}
 }
