@@ -11,6 +11,7 @@
 #include <rendering/Cursor.h>
 #include <rendering/PolyGen.h>
 #include <rendering/TextureMap.h>
+#include <rendering/VertexFmt.h>
 #include <rendering/WorldRenderer.h>
 
 #include <citro3d.h>
@@ -144,6 +145,17 @@ void Renderer_Render() {
 
 			SpriteBatch_BindGuiTexture(GuiTexture_Widgets);
 			if (iod == 0.f) SpriteBatch_PushQuad(200 / 2 - 16 / 2, 120 / 2 - 16 / 2, 0, 16, 16, 240, 0, 16, 16);
+
+			// Abbaufortschritt unter dem Fadenkreuz
+			if (player->gamemode == Gamemode_Survival && player->breakProgress > 0.f && player->breakProgressMax > 0.f) {
+				const int barWidth = 24;
+				int filled = (int)(player->breakProgress / player->breakProgressMax * barWidth);
+				if (filled > barWidth) filled = barWidth;
+				SpriteBatch_PushSingleColorQuad(200 / 2 - barWidth / 2 - 1, 120 / 2 + 12 - 1, 1, barWidth + 2, 4,
+								SHADER_RGB(6, 6, 6));
+				SpriteBatch_PushSingleColorQuad(200 / 2 - barWidth / 2, 120 / 2 + 12, 2, filled, 2,
+								SHADER_RGB(10, 31, 10));
+			}
 		} else {
 			C3D_Mtx projection;
 			Mtx_PerspStereoTilt(&projection, C3D_AngleFromDegrees(90.f), ((400.f) / (240.f)), 0.22f, 4.f * CHUNK_SIZE,
@@ -190,6 +202,20 @@ void Renderer_Render() {
 					  120 - INVENTORY_QUICKSELECT_HEIGHT, player->quickSelectBar, player->quickSelectBarSlots,
 					  &player->quickSelectBarSlot);
 		Inventory_Draw(0, 0, 160, player->inventory, sizeof(player->inventory) / sizeof(ItemStack));
+
+		// Lebensanzeige
+		if (player->gamemode == Gamemode_Survival) {
+			SpriteBatch_BindGuiTexture(GuiTexture_Icons);
+			int heartsX = 160 / 2 - (10 * 8 + 1) / 2;
+			int heartsY = 120 - INVENTORY_QUICKSELECT_HEIGHT - 11;
+			for (int i = 0; i < 10; i++) {
+				SpriteBatch_PushQuad(heartsX + i * 8, heartsY, 12, 9, 9, 16, 0, 9, 9);
+				if (player->hp >= (float)((i + 1) * 2))
+					SpriteBatch_PushQuad(heartsX + i * 8, heartsY, 13, 9, 9, 52, 0, 9, 9);
+				else if (player->hp >= (float)(i * 2 + 1))
+					SpriteBatch_PushQuad(heartsX + i * 8, heartsY, 13, 9, 9, 61, 0, 9, 9);
+			}
+		}
 
 		if (showDebugInfo) DebugUI_Draw();
 	}

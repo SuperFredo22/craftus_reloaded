@@ -12,6 +12,8 @@
 #include <rendering/Clouds.h>
 #include <rendering/Hand.h>
 
+#include <entity/Mob.h>
+
 static Player* player;
 static World* world;
 
@@ -200,6 +202,8 @@ void WorldRenderer_Render(float iod) {
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, projectionUniform, &camera.vp);
 
 	renderWorld();
+
+	Mobs_Draw(projectionUniform, &camera.vp);
 
 	Clouds_Render(projectionUniform, &camera.vp, world, player->position.x, player->position.z);
 

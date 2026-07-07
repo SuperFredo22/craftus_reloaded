@@ -6,6 +6,7 @@
 #include <3ds.h>
 
 #include <GameStates.h>
+#include <entity/Mob.h>
 #include <entity/Player.h>
 #include <entity/PlayerController.h>
 #include <gui/DebugUI.h>
@@ -36,6 +37,8 @@ void releaseWorld(ChunkWorker* chunkWorker, SaveManager* savemgr, World* world) 
 	World_Reset(world);
 
 	SaveManager_Unload(savemgr);
+
+	Mobs_Reset();
 }
 
 int main() {
@@ -72,6 +75,8 @@ int main() {
 	SmeaGen_Init(&smeaGen, world);
 
 	Renderer_Init(world, &player, &chunkWorker.queue, &gamestate);
+
+	Mobs_Init(world, &player);
 
 	DebugUI_Init();
 
@@ -144,6 +149,8 @@ int main() {
 
 			PlayerController_Update(&playerCtrl, inputData, dt);
 
+			Mobs_Update(dt);
+
 			World_UpdateChunkCache(world, WorldToChunkCoord(FastFloor(player.position.x)),
 					       WorldToChunkCoord(FastFloor(player.position.z)));
 		} else if (gamestate == GameState_SelectWorld) {
@@ -188,7 +195,18 @@ int main() {
 						}
 					}
 					player.position.y = (float)highestBlock + 0.2f;
+
+					// neue Welten starten im Survival Modus
+					player.gamemode = Gamemode_Survival;
+					player.hp = PLAYER_MAX_HP;
+					player.flying = false;
+					Player_ClearInventory(&player);
 				}
+				player.spawnPos = player.position;
+				player.fallDistance = 0.f;
+				player.hurtTimer = 0.f;
+				player.respawnImmunity = 0.f;
+				player.breakProgress = 0.f;
 
 				gamestate = GameState_Playing;
 				lastTime = svcGetSystemTick();  // fix timing
@@ -209,6 +227,8 @@ int main() {
 	sino_exit();
 
 	WorldSelect_Deinit();
+
+	Mobs_Deinit();
 
 	DebugUI_Deinit();
 

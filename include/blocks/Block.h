@@ -21,6 +21,8 @@ enum { Block_Air,
        Block_Planks,
        Block_Wool,
        Block_Bedrock,
+       Block_CoalOre,
+       Block_IronOre,
        Blocks_Count };
 
 void Block_Init();
@@ -33,5 +35,10 @@ void Block_GetTexture(Block block, Direction direction, uint8_t metadata, int16_
 void Block_GetColor(Block block, uint8_t metadata, Direction direction, uint8_t out_rgb[]);
 
 bool Block_Opaque(Block block, uint8_t metadata);
+
+// Sekunden die es dauert den Block abzubauen, negativ = unzerstörbar
+float Block_GetHardness(Block block);
+// Welcher Block beim Abbauen ins Inventar wandert (Block_Air = nichts)
+Block Block_GetDrop(Block block);
 
 extern const char* BlockNames[Blocks_Count];

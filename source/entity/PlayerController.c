@@ -1,5 +1,6 @@
 #include <entity/PlayerController.h>
 
+#include <entity/Mob.h>
 #include <misc/CommandLine.h>
 #include <misc/NumberUtils.h>
 
@@ -279,13 +280,18 @@ void PlayerController_Update(PlayerController* ctrl, InputData input, float dt) 
 	float placeBlock = IsKeyDown(ctrl->controlScheme.placeBlock, &agnosticInput);
 	float breakBlock = IsKeyDown(ctrl->controlScheme.breakBlock, &agnosticInput);
 	if (placeBlock > 0.f) Player_PlaceBlock(player);
-	if (breakBlock > 0.f) Player_BreakBlock(player);
+	if (breakBlock > 0.f) {
+		if (Mobs_TryHit(player)) player->breakProgress = 0.f;
+		else Player_BreakBlock(player, dt);
+	} else {
+		player->breakProgress = 0.f;
+	}
 
 	if (jump > 0.f) Player_Jump(player, movement);
 
 	bool releasedJump = WasKeyReleased(ctrl->controlScheme.jump, &agnosticInput);
 	if (ctrl->flyTimer >= 0.f) {
-		if (jump > 0.f) player->flying ^= true;
+		if (jump > 0.f && player->gamemode == Gamemode_Creative) player->flying ^= true;
 		ctrl->flyTimer += dt;
 		if (ctrl->flyTimer > 0.25f) ctrl->flyTimer = -1.f;
 	} else if (releasedJump) {

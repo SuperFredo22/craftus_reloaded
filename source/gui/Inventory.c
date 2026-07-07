@@ -26,6 +26,11 @@ void Inventory_DrawQuickSelect(int x, int y, ItemStack* stacks, int count, int* 
 		int rx = (i * 20 + x + 3) * 2;
 		int ry = (y + 3) * 2;
 		if (stacks[i].amount > 0) SpriteBatch_PushIcon(stacks[i].block, stacks[i].meta, rx, ry, 11);
+		if (stacks[i].amount > 1) {
+			SpriteBatch_PushText(rx + 33 - SpriteBatch_CalcTextWidth("%d", stacks[i].amount), ry + 25, 13, INT16_MAX,
+					     true, INT_MAX, NULL, "%d", stacks[i].amount);
+			SpriteBatch_BindGuiTexture(GuiTexture_Widgets);
+		}
 		if (Gui_EnteredCursorInside(rx - 4, ry - 4, 18 * 2, 18 * 2)) {
 			*selected = i;
 			clickAtStack(&stacks[i]);
@@ -58,6 +63,9 @@ void Inventory_Draw(int x, int y, int w, ItemStack* stacks, int count) {
 
 	for (int i = 0; i < count; i++) {
 		if (stacks[i].amount > 0) SpriteBatch_PushIcon(stacks[i].block, stacks[i].meta, headX * 2, headY * 2, 10);
+		if (stacks[i].amount > 1)
+			SpriteBatch_PushText(headX * 2 + 33 - SpriteBatch_CalcTextWidth("%d", stacks[i].amount), headY * 2 + 25, 13,
+					     INT16_MAX, true, INT_MAX, NULL, "%d", stacks[i].amount);
 		if (Gui_EnteredCursorInside(headX * 2, headY * 2, 16 * 2, 16 * 2)) clickAtStack(&stacks[i]);
 		SpriteBatch_PushSingleColorQuad(headX * 2, headY * 2, 9, 16 * 2, 16 * 2,
 						sourceStack == &stacks[i] ? SHADER_RGB(20, 5, 2) : colors[even]);

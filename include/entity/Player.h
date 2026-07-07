@@ -18,6 +18,10 @@
 
 #define PLAYER_PLACE_REPLACE_TIMEOUT (0.2f)
 
+#define PLAYER_MAX_HP (20.f)
+
+typedef enum { Gamemode_Survival = 0, Gamemode_Creative = 1 } Gamemode;
+
 typedef struct {
 	float3 position;
 	float pitch, yaw;
@@ -33,6 +37,16 @@ typedef struct {
 	float simStepAccum;
 
 	float breakPlaceTimeout;
+
+	Gamemode gamemode;
+	float hp;
+	float hurtTimer;
+	float fallDistance;
+	float respawnImmunity;
+	float3 spawnPos;
+
+	float breakProgress, breakProgressMax;
+	int breakX, breakY, breakZ;
 
 	ItemStack inventory[12 + 16];
 
@@ -51,8 +65,18 @@ void Player_Update(Player* player);
 void Player_Move(Player* player, float dt, float3 accl);
 
 void Player_PlaceBlock(Player* player);
-void Player_BreakBlock(Player* player);
+void Player_BreakBlock(Player* player, float dt);
 
 void Player_Jump(Player* player, float3 accl);
 
 void Player_Teleport(Player* player, float x, float y, float z);
+
+// Fügt Schaden zu (nur im Survival Modus), setzt ggf. den Respawn in Gang
+void Player_Hurt(Player* player, float damage);
+// Versucht einen Gegenstand ins Inventar zu legen, false wenn kein Platz
+bool Player_CollectItem(Player* player, Block block, uint8_t meta);
+
+// Befüllt das Inventar mit der Kreativ Palette
+void Player_FillCreativeInventory(Player* player);
+// Leert das komplette Inventar (für Survival)
+void Player_ClearInventory(Player* player);

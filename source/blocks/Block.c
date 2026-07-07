@@ -13,7 +13,7 @@ static Texture_Map textureMap;
 	, A(dirt, "dirt.png"), A(cobblestone, "cobblestone.png"), A(grass_side, "grass_side.png"), A(grass_top, "grass_top.png"),  \
 	    A(stonebrick, "stonebrick.png"), A(sand, "sand.png"), A(oaklog_side, "log_oak.png"), A(oaklog_top, "log_oak_top.png"), \
 	    A(leaves_oak, "leaves_oak.png"), A(glass, "glass.png"), A(brick, "brick.png"), A(oakplanks, "planks_oak.png"),         \
-	    A(wool, "wool.png"), A(bedrock, "bedrock.png")
+	    A(wool, "wool.png"), A(bedrock, "bedrock.png"), A(coalore, "coal_ore.png"), A(ironore, "iron_ore.png")
 
 #define A(i, n) PPRX n
 const char* texture_files[] = {TEXTURE_FILES};
@@ -35,6 +35,8 @@ static struct {
 	Texture_MapIcon oakplanks;
 	Texture_MapIcon wool;
 	Texture_MapIcon bedrock;
+	Texture_MapIcon coalore;
+	Texture_MapIcon ironore;
 } icon;
 
 void Block_Init() {
@@ -109,6 +111,12 @@ void Block_GetTexture(Block block, Direction direction, uint8_t metadata, int16_
 		case Block_Bedrock:
 			i = icon.bedrock;
 			break;
+		case Block_CoalOre:
+			i = icon.coalore;
+			break;
+		case Block_IronOre:
+			i = icon.ironore;
+			break;
 		default: break;
 	}
 	out_uv[0] = i.u;
@@ -143,5 +151,54 @@ void Block_GetColor(Block block, uint8_t metadata, Direction direction, uint8_t 
 
 bool Block_Opaque(Block block, uint8_t metadata) { return block != Block_Air && block != Block_Leaves && block != Block_Glass; }
 
+float Block_GetHardness(Block block) {
+	switch (block) {
+		case Block_Air:
+			return 0.f;
+		case Block_Bedrock:
+			return -1.f;
+		case Block_Leaves:
+			return 0.3f;
+		case Block_Glass:
+			return 0.45f;
+		case Block_Dirt:
+		case Block_Grass:
+		case Block_Sand:
+			return 0.75f;
+		case Block_Wool:
+			return 1.1f;
+		case Block_Log:
+		case Block_Planks:
+			return 1.5f;
+		case Block_Stone:
+			return 2.2f;
+		case Block_Cobblestone:
+		case Block_Stonebrick:
+		case Block_Brick:
+			return 2.5f;
+		case Block_CoalOre:
+			return 3.f;
+		case Block_IronOre:
+			return 3.5f;
+		default:
+			return 1.f;
+	}
+}
+
+Block Block_GetDrop(Block block) {
+	switch (block) {
+		case Block_Grass:
+			return Block_Dirt;
+		case Block_Stone:
+			return Block_Cobblestone;
+		case Block_Leaves:
+		case Block_Glass:
+			return Block_Air;
+		default:
+			return block;
+	}
+}
+
 const char* BlockNames[Blocks_Count] = {"Air",    "Stone", "Dirt",	 "Grass",  "Cobblestone", "Sand", "Log",
-					"Leaves", "Glass", "Stone Bricks", "Bricks", "Planks",      "Wool", "Bedrock"};
+					"Leaves", "Glass", "Stone Bricks", "Bricks", "Planks",      "Wool", "Bedrock",
+					"Coal Ore", "Iron Ore"};

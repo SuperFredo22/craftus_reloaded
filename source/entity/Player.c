@@ -1,6 +1,35 @@
 #include <entity/Player.h>
 
+#include <limits.h>
+
+#include <gui/DebugUI.h>
 #include <misc/Collision.h>
+
+void Player_FillCreativeInventory(Player* player) {
+	int l = 0;
+	player->inventory[l++] = (ItemStack){Block_Stone, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Dirt, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Grass, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Cobblestone, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Sand, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Log, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Leaves, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Glass, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Stonebrick, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Brick, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_Planks, 0, 1};
+	player->inventory[l++] = (ItemStack){Block_CoalOre, 0, 1};
+	for (int i = 0; i < 16; i++) player->inventory[l++] = (ItemStack){Block_Wool, i, 1};
+	while (l < (int)(sizeof(player->inventory) / sizeof(ItemStack))) player->inventory[l++] = (ItemStack){Block_Air, 0, 0};
+
+	for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
+}
+
+void Player_ClearInventory(Player* player) {
+	for (int i = 0; i < (int)(sizeof(player->inventory) / sizeof(ItemStack)); i++)
+		player->inventory[i] = (ItemStack){Block_Air, 0, 0};
+	for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
+}
 
 void Player_Init(Player* player, World* world) {
 	player->position = f3_new(0.f, 0.f, 0.f);
@@ -31,26 +60,75 @@ void Player_Init(Player* player, World* world) {
 
 	player->quickSelectBarSlots = INVENTORY_QUICKSELECT_MAXSLOTS;
 	player->quickSelectBarSlot = 0;
-	{
-		int l = 0;
-		player->inventory[l++] = (ItemStack){Block_Stone, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Dirt, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Grass, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Cobblestone, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Sand, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Log, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Leaves, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Glass, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Stonebrick, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Brick, 0, 1};
-		player->inventory[l++] = (ItemStack){Block_Planks, 0, 1};
-		for (int i = 0; i < 16; i++) player->inventory[l++] = (ItemStack){Block_Wool, i, 1};
-		player->inventory[l++] = (ItemStack){Block_Bedrock, 0, 1};
 
-		for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) player->quickSelectBar[i] = (ItemStack){Block_Air, 0, 0};
-	}
+	player->gamemode = Gamemode_Creative;
+	player->hp = PLAYER_MAX_HP;
+	player->hurtTimer = 0.f;
+	player->fallDistance = 0.f;
+	player->respawnImmunity = 0.f;
+	player->spawnPos = f3_new(0.f, 64.f, 0.f);
+
+	player->breakProgress = 0.f;
+	player->breakProgressMax = 0.f;
+	player->breakX = player->breakY = player->breakZ = INT_MIN;
+
+	Player_FillCreativeInventory(player);
 
 	player->autoJumpEnabled = true;
+}
+
+bool Player_CollectItem(Player* player, Block block, uint8_t meta) {
+	if (block == Block_Air) return true;
+
+	ItemStack* stackGroups[2] = {player->quickSelectBar, player->inventory};
+	int stackGroupSizes[2] = {INVENTORY_QUICKSELECT_MAXSLOTS, sizeof(player->inventory) / sizeof(ItemStack)};
+
+	// erst versuchen auf existierende Stapel zu legen...
+	for (int g = 0; g < 2; g++)
+		for (int i = 0; i < stackGroupSizes[g]; i++) {
+			ItemStack* stack = &stackGroups[g][i];
+			if (stack->amount > 0 && stack->amount < ITEMSTACK_MAX && stack->block == block && stack->meta == meta) {
+				stack->amount++;
+				return true;
+			}
+		}
+	// ...dann einen freien Platz suchen
+	for (int g = 0; g < 2; g++)
+		for (int i = 0; i < stackGroupSizes[g]; i++) {
+			ItemStack* stack = &stackGroups[g][i];
+			if (stack->amount == 0) {
+				*stack = (ItemStack){block, meta, 1};
+				return true;
+			}
+		}
+	return false;
+}
+
+void Player_Hurt(Player* player, float damage) {
+	if (player->gamemode != Gamemode_Survival || player->respawnImmunity > 0.f) return;
+	if (player->hurtTimer > 0.f) return;
+
+	player->hp -= damage;
+	player->hurtTimer = 0.5f;
+
+	if (player->hp <= 0.f) {
+		DebugUI_Log("You died!");
+
+		player->hp = PLAYER_MAX_HP;
+		player->hurtTimer = 0.f;
+		player->breakProgress = 0.f;
+
+		float3 spawn = player->spawnPos;
+		int height = World_GetHeight(player->world, FastFloor(spawn.x), FastFloor(spawn.z));
+		if (height > 0) spawn.y = (float)height + 1.f;
+
+		Player_Teleport(player, spawn.x, spawn.y, spawn.z);
+		// kurze Schwebephase, damit die Chunks am Spawn nachladen können
+		player->respawnImmunity = 2.f;
+		player->fallDistance = -1000.f;  // der erste Sturz nach dem Respawn ist frei
+		player->flying = false;
+		player->crouching = false;
+	}
 }
 
 void Player_Update(Player* player) {
@@ -97,6 +175,22 @@ const float MaxFallVelocity = -50.f;
 const float GravityPlusFriction = 10.f;
 void Player_Move(Player* player, float dt, float3 accl) {
 	player->breakPlaceTimeout -= dt;
+	if (player->hurtTimer > 0.f) player->hurtTimer -= dt;
+
+	if (player->respawnImmunity > 0.f) {
+		player->respawnImmunity -= dt;
+		player->velocity = f3_new(0.f, 0.f, 0.f);
+		player->simStepAccum = 0.f;
+		return;
+	}
+
+	// in die Leere gefallen
+	if (player->gamemode == Gamemode_Survival && player->position.y < -30.f) {
+		player->hurtTimer = 0.f;
+		Player_Hurt(player, PLAYER_MAX_HP + 1.f);
+		return;
+	}
+
 	player->simStepAccum += dt;
 	const float SimStep = 1.f / 60.f;
 	while (player->simStepAccum >= SimStep) {
@@ -191,6 +285,14 @@ void Player_Move(Player* player, float dt, float3 accl) {
 			player->velocity.y = 0.f;
 		}
 
+		if (finalPos.y < player->position.y && !player->flying) player->fallDistance += player->position.y - finalPos.y;
+		if (player->grounded) {
+			if (player->fallDistance > 3.f) Player_Hurt(player, floorf(player->fallDistance - 3.f));
+			player->fallDistance = 0.f;
+		} else if (player->flying) {
+			player->fallDistance = 0.f;
+		}
+
 		player->position = finalPos;
 		player->velocity = f3_new(player->velocity.x * 0.95f, player->velocity.y, player->velocity.z * 0.95f);
 		if (ABS(player->velocity.x) < 0.1f) player->velocity.x = 0.f;
@@ -202,6 +304,11 @@ void Player_Move(Player* player, float dt, float3 accl) {
 
 void Player_PlaceBlock(Player* player) {
 	if (player->world && player->blockInActionRange && player->breakPlaceTimeout < 0.f) {
+		ItemStack* stack = &player->quickSelectBar[player->quickSelectBarSlot];
+		if (stack->block == Block_Air || (player->gamemode == Gamemode_Survival && stack->amount == 0)) {
+			if (player->breakPlaceTimeout < 0.f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+			return;
+		}
 		const int* offset = DirectionToOffset[player->viewRayCast.direction];
 		if (AABB_Overlap(player->position.x - PLAYER_COLLISIONBOX_SIZE / 2.f, player->position.y,
 				 player->position.z - PLAYER_COLLISIONBOX_SIZE / 2.f, PLAYER_COLLISIONBOX_SIZE, PLAYER_HEIGHT,
@@ -209,17 +316,53 @@ void Player_PlaceBlock(Player* player) {
 				 player->viewRayCast.z + offset[2], 1.f, 1.f, 1.f))
 			return;
 		World_SetBlockAndMeta(player->world, player->viewRayCast.x + offset[0], player->viewRayCast.y + offset[1],
-				      player->viewRayCast.z + offset[2], player->quickSelectBar[player->quickSelectBarSlot].block,
-				      player->quickSelectBar[player->quickSelectBarSlot].meta);
+				      player->viewRayCast.z + offset[2], stack->block, stack->meta);
+		if (player->gamemode == Gamemode_Survival && --stack->amount == 0) *stack = (ItemStack){Block_Air, 0, 0};
 	}
 	if (player->breakPlaceTimeout < 0.f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
 }
 
-void Player_BreakBlock(Player* player) {
-	if (player->world && player->blockInActionRange && player->breakPlaceTimeout < 0.f) {
-		World_SetBlock(player->world, player->viewRayCast.x, player->viewRayCast.y, player->viewRayCast.z, Block_Air);
+void Player_BreakBlock(Player* player, float dt) {
+	if (!player->world || !player->blockInActionRange) {
+		player->breakProgress = 0.f;
+		return;
 	}
-	if (player->breakPlaceTimeout < 0.f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+
+	if (player->gamemode == Gamemode_Creative) {
+		if (player->breakPlaceTimeout < 0.f) {
+			World_SetBlock(player->world, player->viewRayCast.x, player->viewRayCast.y, player->viewRayCast.z, Block_Air);
+			player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+		}
+		return;
+	}
+
+	int x = player->viewRayCast.x, y = player->viewRayCast.y, z = player->viewRayCast.z;
+	if (x != player->breakX || y != player->breakY || z != player->breakZ) {
+		player->breakProgress = 0.f;
+		player->breakX = x;
+		player->breakY = y;
+		player->breakZ = z;
+	}
+
+	Block block = World_GetBlock(player->world, x, y, z);
+	if (block == Block_Air) {
+		player->breakProgress = 0.f;
+		return;
+	}
+	float hardness = Block_GetHardness(block);
+	if (hardness < 0.f) return;  // unzerstörbar
+
+	// Schlaganimation am Laufen halten
+	if (player->breakPlaceTimeout < -0.1f) player->breakPlaceTimeout = PLAYER_PLACE_REPLACE_TIMEOUT;
+
+	player->breakProgressMax = hardness;
+	player->breakProgress += dt;
+	if (player->breakProgress >= hardness) {
+		uint8_t meta = World_GetMetadata(player->world, x, y, z);
+		World_SetBlock(player->world, x, y, z, Block_Air);
+		Player_CollectItem(player, Block_GetDrop(block), meta);
+		player->breakProgress = 0.f;
+	}
 }
 
 void Player_Teleport(Player* player, float x, float y, float z) {

@@ -32,6 +32,28 @@ void CommandLine_Execute(World* world, Player* player, const char* text) {
 				return;
 			}
 		}
+		{
+			char mode;
+			if (sscanf(&text[1], "gamemode %c", &mode) == 1) {
+				if (mode == '0' || mode == 's') {
+					player->gamemode = Gamemode_Survival;
+					player->flying = false;
+					DebugUI_Log("Gamemode: Survival");
+				} else if (mode == '1' || mode == 'c') {
+					player->gamemode = Gamemode_Creative;
+					Player_FillCreativeInventory(player);
+					DebugUI_Log("Gamemode: Creative");
+				} else {
+					DebugUI_Log("Usage: /gamemode <s|c>");
+				}
+				return;
+			}
+		}
+		if (!strcmp(&text[1], "heal")) {
+			player->hp = PLAYER_MAX_HP;
+			DebugUI_Log("Healed!");
+			return;
+		}
 		if (length == 2 && text[1] == 'd') {
 			extern bool showDebugInfo;
 			showDebugInfo ^= true;

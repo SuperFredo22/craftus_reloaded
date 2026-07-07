@@ -62,6 +62,36 @@ void SaveManager_Load(SaveManager* mgr, char* path) {
 		mgr->player->flying = mpack_elvis(player, "flying", bool, false);
 		mgr->player->crouching = mpack_elvis(player, "crouching", bool, false);
 
+		mgr->player->gamemode = (Gamemode)mpack_elvis(player, "gamemode", uint, Gamemode_Creative);
+		mgr->player->hp = mpack_elvis(player, "hp", float, PLAYER_MAX_HP);
+		if (mgr->player->hp <= 0.f || mgr->player->hp > PLAYER_MAX_HP) mgr->player->hp = PLAYER_MAX_HP;
+
+		mgr->player->spawnPos.x = mpack_elvis(player, "spawnX", float, mgr->player->position.x);
+		mgr->player->spawnPos.y = mpack_elvis(player, "spawnY", float, mgr->player->position.y);
+		mgr->player->spawnPos.z = mpack_elvis(player, "spawnZ", float, mgr->player->position.z);
+
+		mpack_node_t invNode = mpack_node_map_cstr_optional(player, "inventory");
+		if (mpack_node_type(invNode) == mpack_type_array &&
+		    mpack_node_array_length(invNode) == (INVENTORY_QUICKSELECT_MAXSLOTS + 12 + 16) * 3) {
+			int idx = 0;
+			for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) {
+				mgr->player->quickSelectBar[i].block = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+				mgr->player->quickSelectBar[i].meta = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+				mgr->player->quickSelectBar[i].amount = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+			}
+			for (int i = 0; i < 12 + 16; i++) {
+				mgr->player->inventory[i].block = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+				mgr->player->inventory[i].meta = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+				mgr->player->inventory[i].amount = mpack_node_uint(mpack_node_array_at(invNode, idx++));
+			}
+		} else {
+			// alter Spielstand ohne Inventar
+			if (mgr->player->gamemode == Gamemode_Creative)
+				Player_FillCreativeInventory(mgr->player);
+			else
+				Player_ClearInventory(mgr->player);
+		}
+
 		mpack_error_t err = mpack_tree_destroy(&levelTree);
 		if (err != mpack_ok) {
 			Crash("Mpack error %d while loading world manifest %s", err, path);
@@ -79,7 +109,7 @@ void SaveManager_Unload(SaveManager* mgr) {
 
 	mpack_write_cstr(&writer, "players");
 	mpack_start_array(&writer, 1);
-	mpack_start_map(&writer, 7);
+	mpack_start_map(&writer, 13);
 
 	mpack_write_cstr(&writer, "x");
 	mpack_write_float(&writer, mgr->player->position.x);
@@ -98,6 +128,33 @@ void SaveManager_Unload(SaveManager* mgr) {
 	
 	mpack_write_cstr(&writer, "crouching");
 	mpack_write_bool(&writer, mgr->player->crouching);
+
+	mpack_write_cstr(&writer, "gamemode");
+	mpack_write_uint(&writer, mgr->player->gamemode);
+
+	mpack_write_cstr(&writer, "hp");
+	mpack_write_float(&writer, mgr->player->hp);
+
+	mpack_write_cstr(&writer, "spawnX");
+	mpack_write_float(&writer, mgr->player->spawnPos.x);
+	mpack_write_cstr(&writer, "spawnY");
+	mpack_write_float(&writer, mgr->player->spawnPos.y);
+	mpack_write_cstr(&writer, "spawnZ");
+	mpack_write_float(&writer, mgr->player->spawnPos.z);
+
+	mpack_write_cstr(&writer, "inventory");
+	mpack_start_array(&writer, (INVENTORY_QUICKSELECT_MAXSLOTS + 12 + 16) * 3);
+	for (int i = 0; i < INVENTORY_QUICKSELECT_MAXSLOTS; i++) {
+		mpack_write_uint(&writer, mgr->player->quickSelectBar[i].block);
+		mpack_write_uint(&writer, mgr->player->quickSelectBar[i].meta);
+		mpack_write_uint(&writer, mgr->player->quickSelectBar[i].amount);
+	}
+	for (int i = 0; i < 12 + 16; i++) {
+		mpack_write_uint(&writer, mgr->player->inventory[i].block);
+		mpack_write_uint(&writer, mgr->player->inventory[i].meta);
+		mpack_write_uint(&writer, mgr->player->inventory[i].amount);
+	}
+	mpack_finish_array(&writer);
 
 	mpack_finish_map(&writer);
 	mpack_finish_array(&writer);

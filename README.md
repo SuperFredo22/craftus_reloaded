@@ -1,6 +1,6 @@
 # Craftus 3D Reloaded
 
-Craftus Reloaded is a homebrew Minecraft clone for Nintendo 3DS. It's under active development. It currently features only a creative-mode-esque game mode with infinite resources.
+Craftus Reloaded is a homebrew Minecraft clone for Nintendo 3DS. It's under active development. It features a creative mode with infinite resources and a survival mode with health, mining, item collection and zombies.
 
 ![](https://raw.githubusercontent.com/wiki/RSDuck/craftus_reloaded/screenshots/15t.png)|![](https://raw.githubusercontent.com/wiki/RSDuck/craftus_reloaded/screenshots/17t.png)|![](https://raw.githubusercontent.com/wiki/RSDuck/craftus_reloaded/screenshots/16t.png)
 ----|----|----
@@ -13,12 +13,17 @@ It's been a while since I started developing this version of Craftus. I started 
 ## Features
 
 * An infinte world(in theory)
-* Two different world generators
+* Two different world generators, with coal/iron ore veins and trees
 * Blocks, of multiple variants, can be broken and placed down to build structures
 * A basic inventory system
 * Saving and loading, multiple worlds
 * Clouds and menus
-* Sneaking and Flying
+* Sneaking and Flying (flying only in creative mode)
+* Survival mode: health with fall/void damage, timed block breaking with drops,
+  item stacks that get consumed when placing, zombies that chase and attack you
+* New worlds start in survival mode. Use the command line (Select) with
+  `/gamemode c` or `/gamemode s` to switch mode, `/heal` to restore health.
+  Old worlds keep behaving like before (creative).
 
 ## Default Controls
 
